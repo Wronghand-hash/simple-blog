@@ -5,7 +5,6 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { BlogsModule } from './blogs/blogs.module';
 import { UsersModule } from './users/users.module';
-import { CommentsModule } from './comments/comments.module';
 import { PassportModule } from '@nestjs/passport';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
@@ -28,7 +27,6 @@ import { BullModule } from '@nestjs/bull';
     DatabaseModule,
     BlogsModule,
     UsersModule,
-    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
