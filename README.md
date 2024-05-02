@@ -14,7 +14,7 @@ Installation
 
 Clone the repository:
 
-git clone https://github.com/yourusername/nestjs-blogging-app.git
+git clone 'https://github.com/Wronghand-hash/simple-blog'
 
 Install dependencies:
 
