@@ -11,6 +11,8 @@ import { User } from '../users/entities/user.entity';
 import { BullModule } from '@nestjs/bull';
 import { userMailService } from './Mail.process';
 
+// mailservice registered from bull module to be proccessed at src/blogs/mailproccess.ts
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Blog, Comment, Tag, User]),

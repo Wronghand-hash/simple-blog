@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module';
 import { PassportModule } from '@nestjs/passport';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BullModule } from '@nestjs/bull';
     DatabaseModule,
     BlogsModule,
     UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
