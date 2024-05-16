@@ -1,41 +1,50 @@
 import * as bcrypt from 'bcryptjs';
 import * as nodemailer from 'nodemailer';
-import { default as config } from '../config';
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JWTService } from './jwt.service';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { InjectRepository } from '@nestjs/typeorm';
+import { User } from 'src/users/entities/user.entity';
+import { ForgottenPassword } from './entities/forgottenPassword.entity';
+import { EmailVerification } from './entities/EmailVerification.entity';
+import { ConsentRegistary } from './entities/consentRegistary.entity';
+import { SigninDto } from 'src/users/dto/signin.dto';
+import { EntityManager, Repository } from 'typeorm';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User) private readonly userModel,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @InjectRepository(EmailVerification)
-    private readonly emailVerificationModel,
+    private readonly emailVerificationModel: Repository<EmailVerification>,
     @InjectRepository(ForgottenPassword)
-    private readonly forgottenPasswordModel,
-    @InjectRepository(ConsentRegistry)
-    private readonly consentRegistryModel,
+    private readonly forgottenPasswordModel: Repository<ForgottenPassword>,
+    @InjectRepository(ConsentRegistary)
+    private readonly consentRegistryModel: Repository<ConsentRegistary>,
     private readonly jwtService: JWTService,
     private readonly httpService: HttpService,
+    private readonly entityManager: EntityManager,
   ) {}
 
   async validateLogin(email, password) {
-    var userFromDb = await this.userModel.findOne({ email: email });
+    const userFromDb = await this.userRepository.findOne({
+      where: { email: email },
+    });
     if (!userFromDb)
       throw new HttpException('LOGIN.USER_NOT_FOUND', HttpStatus.NOT_FOUND);
-    if (!userFromDb.auth.email.valid)
+    if (!userFromDb.valid)
       throw new HttpException('LOGIN.EMAIL_NOT_VERIFIED', HttpStatus.FORBIDDEN);
 
-    var isValidPass = await bcrypt.compare(password, userFromDb.password);
+    let isValidPass = await bcrypt.compare(password, userFromDb.password);
 
     if (isValidPass) {
       var accessToken = await this.jwtService.createToken(
         email,
         userFromDb.roles,
       );
-      return { token: accessToken, user: new UserDto(userFromDb) };
+      return { token: accessToken, user: userFromDb };
     } else {
       throw new HttpException('LOGIN.ERROR', HttpStatus.UNAUTHORIZED);
     }
@@ -43,7 +52,7 @@ export class AuthService {
 
   async createEmailToken(email: string): Promise<boolean> {
     var emailVerification = await this.emailVerificationModel.findOne({
-      email: email,
+      where: { email: email },
     });
     if (
       emailVerification &&
@@ -55,69 +64,87 @@ export class AuthService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     } else {
-      var emailVerificationModel =
-        await this.emailVerificationModel.findOneAndUpdate(
-          { email: email },
-          {
+      const emailVerificationModel = await this.emailVerificationModel.findOne({
+        where: {
+          email: email,
+        },
+      });
+      if (emailVerificationModel) {
+        emailVerificationModel.email = email;
+        (emailVerificationModel.emailToken = (
+          Math.floor(Math.random() * 9000000) + 1000000
+        ).toString()), //Generate 7 digits number
+          (emailVerificationModel.timestamp = new Date()),
+          await this.entityManager.save(emailVerificationModel);
+      } else {
+        try {
+          const emailVerificationModel = new EmailVerification({
             email: email,
             emailToken: (
               Math.floor(Math.random() * 9000000) + 1000000
-            ).toString(), //Generate 7 digits number
+            ).toString(),
             timestamp: new Date(),
-          },
-          { upsert: true },
-        );
+          });
+
+          await this.entityManager.save(emailVerificationModel);
+        } catch (error) {
+          console.log(error);
+        }
+      }
+
       return true;
     }
   }
 
-  async setPassword(email: string, newPassword: string): Promise<boolean> {
-    var userFromDb = await this.userModel.findOne({ email: email });
+  async setPassword(email: string, newPassword: string) {
+    const userFromDb = await this.userRepository.findOne({
+      where: { email: email },
+    });
     if (!userFromDb)
       throw new HttpException('LOGIN.USER_NOT_FOUND', HttpStatus.NOT_FOUND);
 
     userFromDb.password = await bcrypt.hash(newPassword);
 
-    await userFromDb.save();
+    await this.entityManager.save(userFromDb);
     return true;
   }
 
-  async saveUserConsent(email: string): Promise<ConsentRegistry> {
+  async saveUserConsent(email: string) {
     //TODO: replace with your site url containing the updated version of the consent form
     const privacyPolicyURL = 'https://www.[yoursite].com/api/privacy-policy';
     const cookiePolicyURL = 'https://www.[yoursite].com/api/cookie-policy';
-    try {
-      var newConsent = new this.consentRegistryModel();
-      newConsent.email = email;
-      newConsent.date = new Date();
-      newConsent.registrationForm = [
-        'name',
-        'surname',
-        'email',
-        'birthday date',
-        'password',
-      ];
-      newConsent.checkboxText = 'I accept privacy policy';
-      var privacyPolicyResponse: any = await lastValueFrom(
-        this.httpService.get(privacyPolicyURL),
-      );
-      newConsent.privacyPolicy = privacyPolicyResponse.data;
-      var cookiePolicyResponse: any = await lastValueFrom(
-        this.httpService.get(cookiePolicyURL),
-      );
-      newConsent.cookiePolicy = cookiePolicyResponse.data;
-      newConsent.acceptedPolicy = 'Y';
-      return await newConsent.save();
-    } catch (error) {
-      console.error(error);
-    }
+    // try {
+    //   var newConsent = new this.consentRegistryModel();
+    //   newConsent.email = email;
+    //   newConsent.date = new Date();
+    //   newConsent.registrationForm = [
+    //     'name',
+    //     'surname',
+    //     'email',
+    //     'birthday date',
+    //     'password',
+    //   ];
+    //   newConsent.checkboxText = 'I accept privacy policy';
+    //   var privacyPolicyResponse: any = await lastValueFrom(
+    //     this.httpService.get(privacyPolicyURL),
+    //   );
+    //   newConsent.privacyPolicy = privacyPolicyResponse.data;
+    //   var cookiePolicyResponse: any = await lastValueFrom(
+    //     this.httpService.get(cookiePolicyURL),
+    //   );
+    //   newConsent.cookiePolicy = cookiePolicyResponse.data;
+    //   newConsent.acceptedPolicy = 'Y';
+    //   return await newConsent.save();
+    // } catch (error) {
+    //   console.error(error);
+    // }
   }
 
   async createForgottenPasswordToken(
     email: string,
   ): Promise<ForgottenPassword> {
-    var forgottenPassword = await this.forgottenPasswordModel.findOne({
-      email: email,
+    const forgottenPassword = await this.forgottenPasswordModel.findOne({
+      where: { email: email },
     });
     if (
       forgottenPassword &&
@@ -129,41 +156,45 @@ export class AuthService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     } else {
-      var forgottenPasswordModel =
-        await this.forgottenPasswordModel.findOneAndUpdate(
-          { email: email },
-          {
+      if (forgottenPassword) {
+        const forgottenPasswordModel =
+          await this.forgottenPasswordModel.findOne({
+            where: { email: email },
+          });
+
+        if (forgottenPasswordModel) {
+          forgottenPasswordModel.email = email;
+          forgottenPasswordModel.passToken = (
+            Math.floor(Math.random() * 900000) + 1000000
+          ).toString();
+          forgottenPasswordModel.timestamp = new Date();
+        } else {
+          const forgottenPasswordRow = new ForgottenPassword({
             email: email,
-            newPasswordToken: (
+            passToken: (
               Math.floor(Math.random() * 9000000) + 1000000
-            ).toString(), //Generate 7 digits number,
+            ).toString(),
             timestamp: new Date(),
-          },
-          { upsert: true, new: true },
-        );
-      if (forgottenPasswordModel) {
+          });
+
+          await this.entityManager.save(forgottenPasswordRow);
+        }
         return forgottenPasswordModel;
-      } else {
-        throw new HttpException(
-          'LOGIN.ERROR.GENERIC_ERROR',
-          HttpStatus.INTERNAL_SERVER_ERROR,
-        );
       }
     }
   }
 
   async verifyEmail(token: string): Promise<boolean> {
-    var emailVerif = await this.emailVerificationModel.findOne({
-      emailToken: token,
+    const emailVerif = await this.emailVerificationModel.findOne({
+      where: { emailToken: token },
     });
     if (emailVerif && emailVerif.email) {
-      var userFromDb = await this.userModel.findOne({
-        email: emailVerif.email,
+      var userFromDb = await this.userRepository.findOne({
+        where: { email: emailVerif.email },
       });
       if (userFromDb) {
-        userFromDb.auth.email.valid = true;
-        var savedUser = await userFromDb.save();
-        await emailVerif.remove();
+        userFromDb.valid = true;
+        const savedUser = await this.entityManager.save(userFromDb);
         return !!savedUser;
       }
     } else {
@@ -178,35 +209,39 @@ export class AuthService {
     newPasswordToken: string,
   ): Promise<ForgottenPassword> {
     return await this.forgottenPasswordModel.findOne({
-      newPasswordToken: newPasswordToken,
+      where: { passToken: newPasswordToken },
     });
   }
 
   async sendEmailVerification(email: string): Promise<boolean> {
-    var model = await this.emailVerificationModel.findOne({ email: email });
+    var model = await this.emailVerificationModel.findOne({
+      where: {
+        email: email,
+      },
+    });
 
     if (model && model.emailToken) {
       let transporter = nodemailer.createTransport({
-        host: config.mail.host,
-        port: config.mail.port,
-        secure: config.mail.secure, // true for 465, false for other ports
+        host: process.env.host,
+        port: process.env.port,
+        secure: process.env.secure, // true for 465, false for other ports
         auth: {
-          user: config.mail.user,
-          pass: config.mail.pass,
+          user: process.env.user,
+          pass: process.env.pass,
         },
       });
 
       let mailOptions = {
-        from: '"Company" <' + config.mail.user + '>',
+        from: '"Company" <' + process.env.user + '>',
         to: email, // list of receivers (separated by ,)
         subject: 'Verify Email',
         text: 'Verify Email',
         html:
           'Hi! <br><br> Thanks for your registration<br><br>' +
           '<a href=' +
-          config.host.url +
+          process.env.url +
           ':' +
-          config.host.port +
+          process.env.port +
           '/auth/email/verify/' +
           model.emailToken +
           '>Click here to activate your account</a>', // html body
@@ -233,7 +268,9 @@ export class AuthService {
   }
 
   async checkPassword(email: string, password: string) {
-    var userFromDb = await this.userModel.findOne({ email: email });
+    var userFromDb = await this.userRepository.findOne({
+      where: { email: email },
+    });
     if (!userFromDb)
       throw new HttpException('LOGIN.USER_NOT_FOUND', HttpStatus.NOT_FOUND);
 
@@ -241,36 +278,38 @@ export class AuthService {
   }
 
   async sendEmailForgotPassword(email: string): Promise<boolean> {
-    var userFromDb = await this.userModel.findOne({ email: email });
+    var userFromDb = await this.userRepository.findOne({
+      where: { email: email },
+    });
     if (!userFromDb)
       throw new HttpException('LOGIN.USER_NOT_FOUND', HttpStatus.NOT_FOUND);
 
     var tokenModel = await this.createForgottenPasswordToken(email);
 
-    if (tokenModel && tokenModel.newPasswordToken) {
+    if (tokenModel && tokenModel.passToken) {
       let transporter = nodemailer.createTransport({
-        host: config.mail.host,
-        port: config.mail.port,
-        secure: config.mail.secure, // true for 465, false for other ports
+        host: process.env.host,
+        port: process.env.port,
+        secure: process.env.secure, // true for 465, false for other ports
         auth: {
-          user: config.mail.user,
-          pass: config.mail.pass,
+          user: process.env.user,
+          pass: process.env.pass,
         },
       });
 
       let mailOptions = {
-        from: '"Company" <' + config.mail.user + '>',
+        from: '"Company" <' + process.env.user + '>',
         to: email, // list of receivers (separated by ,)
         subject: 'Frogotten Password',
         text: 'Forgot Password',
         html:
           'Hi! <br><br> If you requested to reset your password<br><br>' +
           '<a href=' +
-          config.host.url +
+          process.env.url +
           ':' +
-          config.host.port +
+          process.env.port +
           '/auth/email/reset-password/' +
-          tokenModel.newPasswordToken +
+          tokenModel.passToken +
           '>Click here</a>', // html body
       };
 

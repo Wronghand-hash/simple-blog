@@ -22,6 +22,7 @@
     "typeorm:create-migrations": "npm run typeorm -- migration:create ./migrations/$npm_config_name"
   },
   "dependencies": {
+    "@nestjs/axios": "^3.0.2",
     "@nestjs/bull": "^10.1.1",
     "@nestjs/bullmq": "^10.1.1",
     "@nestjs/cache-manager": "^2.2.2",
@@ -32,12 +33,15 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/typeorm": "^10.0.2",
     "argon2": "^0.40.1",
+    "bcryptjs": "^2.4.3",
     "bull": "^4.12.2",
     "bullmq": "^5.7.8",
     "cache-manager": "^5.5.2",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.6",
     "express-session": "^1.18.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.13",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pg": "^8.11.5",

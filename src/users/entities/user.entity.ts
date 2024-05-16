@@ -14,6 +14,12 @@ export class User extends AbstractEntity<User> {
   @Column()
   password: string;
 
+  @Column()
+  roles: string;
+
+  @Column()
+  valid: boolean;
+
   @OneToMany(() => Blog, (blog) => blog.user, { cascade: true })
   blogs: Blog[];
 }
