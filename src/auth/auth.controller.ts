@@ -8,14 +8,12 @@ import {
   Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { Login } from './interfaces/login.interface';
-import { User } from '../users/interfaces/user.interface';
-import { ResponseSuccess, ResponseError } from '../common/dto/response.dto';
-import { IResponse } from '../common/interfaces/response.interface';
-import { CreateUserDto } from '../users/dto/create-user.dto';
-import { UserDto } from '../users/dto/user.dto';
+import { ResponseSuccess, ResponseError } from './interface/dto/Response.dto';
+import { IResponse } from './interface/IResponse.interface';
+import { SignupDto } from '../users/dto/signup.dto';
 import { UsersService } from '../users/users.service';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResetPasswordDto } from './dto/ResetPassword.dto';
+import { Login } from './dto/Login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -40,14 +38,12 @@ export class AuthController {
 
   @Post('email/register')
   @HttpCode(HttpStatus.OK)
-  async register(@Body() createUserDto: CreateUserDto): Promise<IResponse> {
+  async register(@Body() signupDto: SignupDto): Promise<IResponse> {
     try {
-      var newUser = new UserDto(
-        await this.userService.createNewUser(createUserDto),
-      );
+      const newUser = await this.userService.signup(signupDto);
       await this.authService.createEmailToken(newUser.email);
       //await this.authService.saveUserConsent(newUser.email); //[GDPR user content]
-      var sent = await this.authService.sendEmailVerification(newUser.email);
+      const sent = await this.authService.sendEmailVerification(newUser.email);
       if (sent) {
         return new ResponseSuccess('REGISTRATION.USER_REGISTERED_SUCCESSFULLY');
       } else {
@@ -61,7 +57,7 @@ export class AuthController {
   @Get('email/verify/:token')
   public async verifyEmail(@Param() params): Promise<IResponse> {
     try {
-      var isEmailVerified = await this.authService.verifyEmail(params.token);
+      let isEmailVerified = await this.authService.verifyEmail(params.token);
       return new ResponseSuccess('LOGIN.EMAIL_VERIFIED', isEmailVerified);
     } catch (error) {
       return new ResponseError('LOGIN.ERROR', error);
@@ -130,7 +126,6 @@ export class AuthController {
           forgottenPasswordModel.email,
           resetPassword.newPassword,
         );
-        if (isNewPasswordChanged) await forgottenPasswordModel.remove();
       } else {
         return new ResponseError('RESET_PASSWORD.CHANGE_PASSWORD_ERROR');
       }

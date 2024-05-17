@@ -1,7 +1,5 @@
 import * as jwt from 'jsonwebtoken';
-import { default as config } from '../config';
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '../../node_modules/@nestjs/mongoose';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -14,8 +12,8 @@ export class JWTService {
   ) {}
 
   async createToken(email, roles) {
-    const expiresIn = config.jwt.expiresIn,
-      secretOrKey = config.jwt.secretOrKey;
+    const expiresIn = process.env.expiresIn,
+      secretOrKey = process.env.secretOrKey;
     const userInfo = { email: email, roles: roles };
     const token = jwt.sign(userInfo, secretOrKey, { expiresIn });
     return {
@@ -25,7 +23,9 @@ export class JWTService {
   }
 
   async validateUser(signedUser): Promise<User> {
-    var userFromDb = await this.userModel.findOne({ email: signedUser.email });
+    var userFromDb = await this.userRepository.findOne({
+      where: { email: signedUser.email },
+    });
     if (userFromDb) {
       return userFromDb;
     }

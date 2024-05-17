@@ -1,9 +1,15 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { SignupDto } from './dto/signup.dto';
 import { User } from './entities/user.entity';
 import * as argon from 'argon2';
 import { EntityManager, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
@@ -25,9 +31,27 @@ export class UsersService {
       });
 
       await this.entityManager.save(user);
+      return user;
     } catch (error) {
       console.log(error);
     }
+  }
+
+  // set new password
+
+  async setPassword(email: string, newPassword: string): Promise<boolean> {
+    var userFromDb = await this.userRepository.findOne({
+      where: {
+        email: email,
+      },
+    });
+    if (!userFromDb)
+      throw new HttpException('LOGIN.USER_NOT_FOUND', HttpStatus.NOT_FOUND);
+
+    userFromDb.password = await bcrypt.hash(newPassword);
+
+    await this.entityManager.save(userFromDb);
+    return true;
   }
 
   //user validation used in auth guard

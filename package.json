@@ -33,6 +33,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/typeorm": "^10.0.2",
     "argon2": "^0.40.1",
+    "axios": "^1.6.8",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.2",
     "bullmq": "^5.7.8",
