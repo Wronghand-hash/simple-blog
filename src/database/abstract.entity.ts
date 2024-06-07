@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { CreateDateColumn, PrimaryGeneratedColumn } from 'typeorm';
 
 export class AbstractEntity<T> {
